@@ -1,0 +1,14 @@
+name = "shop-backend"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shop_db"
+database_id = "abfc503c-5c58-4edc-8756-a3b56be5ed92"
+migrations_dir = "migrations"
+
+# Secrets (never commit values): set with
+#   wrangler secret put WHATSAPP_VERIFY_TOKEN
+# [vars] is for non-secret config only.

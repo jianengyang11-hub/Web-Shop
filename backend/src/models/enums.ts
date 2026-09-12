@@ -1,0 +1,30 @@
+export enum ProductStatus {
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
+}
+
+export enum VariantStatus {
+  ACTIVE = "ACTIVE",
+  INACTIVE = "INACTIVE",
+}
+
+export enum OrderStatus {
+  NEW = "NEW",
+  PENDING_CONFIRMATION = "PENDING_CONFIRMATION",
+  CONFIRMED = "CONFIRMED",
+  PREPARING = "PREPARING",
+  SHIPPED = "SHIPPED",
+  DELIVERED = "DELIVERED",
+  CANCELLED = "CANCELLED",
+  REJECTED = "REJECTED",
+}
+
+export enum OrderChannel {
+  AI = "AI",
+  MANUAL = "MANUAL",
+  LINE = "LINE",
+  FACEBOOK = "FACEBOOK",
+  TELEGRAM = "TELEGRAM",
+  WHATSAPP = "WHATSAPP",
+  WEB = "WEB",
+}

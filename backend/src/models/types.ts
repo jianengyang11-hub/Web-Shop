@@ -5,6 +5,10 @@ export interface Tenant {
   name: string;
   whatsappPhoneNumberId: string | null;
   whatsappAccessToken: string | null;
+  messengerPageId: string | null;
+  messengerAccessToken: string | null;
+  pinHash: string | null;
+  pinSalt: string | null;
   createdAt: string;
 }
 

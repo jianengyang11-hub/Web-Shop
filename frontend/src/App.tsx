@@ -1,6 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
-import TenantGate from "./components/TenantGate";
+import AuthGate from "./components/AuthGate";
 import AIConversations from "./pages/AIConversations";
 import Customers from "./pages/Customers";
 import More from "./pages/More";
@@ -15,7 +15,7 @@ import Stock from "./pages/Stock";
 
 export default function App() {
   return (
-    <TenantGate>
+    <AuthGate>
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Overview />} />
@@ -31,6 +31,6 @@ export default function App() {
           <Route path="more" element={<More />} />
         </Route>
       </Routes>
-    </TenantGate>
+    </AuthGate>
   );
 }

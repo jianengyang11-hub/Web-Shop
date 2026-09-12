@@ -4,10 +4,11 @@ import { api } from "../api/client";
 import StatusBadge from "../components/StatusBadge";
 import type { Order } from "../types";
 
-interface WhatsAppMessage {
+interface ChannelMessage {
   id: string;
   customerName: string | null;
   customerPhone: string | null;
+  channel: "WHATSAPP" | "MESSENGER";
   direction: "INBOUND" | "OUTBOUND";
   body: string;
   createdAt: string;
@@ -15,7 +16,7 @@ interface WhatsAppMessage {
 
 export default function AIConversations() {
   const [orders, setOrders] = useState<Order[] | null>(null);
-  const [messages, setMessages] = useState<WhatsAppMessage[] | null>(null);
+  const [messages, setMessages] = useState<ChannelMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function AIConversations() {
       .then((all) => setOrders(all.filter((o) => o.channel === "AI")))
       .catch((e) => setError(e.message));
     api
-      .get<WhatsAppMessage[]>("/whatsapp-messages")
+      .get<ChannelMessage[]>("/whatsapp-messages")
       .then(setMessages)
       .catch(() => setMessages([]));
   }, []);
@@ -55,16 +56,19 @@ export default function AIConversations() {
       </div>
 
       <div className="space-y-2">
-        <h2 className="font-semibold text-gray-900">WhatsApp Messages</h2>
+        <h2 className="font-semibold text-gray-900">Channel Messages</h2>
         <p className="text-xs text-gray-500">
-          Raw inbound messages logged by the WhatsApp webhook — no NLP is applied; this is a log, not
-          a chat interface.
+          Raw inbound messages logged by the WhatsApp/Messenger webhooks — no NLP is applied; this
+          is a log, not a chat interface.
         </p>
         <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
-          {(!messages || messages.length === 0) && <p className="p-4 text-sm text-gray-500">No WhatsApp messages yet.</p>}
+          {(!messages || messages.length === 0) && <p className="p-4 text-sm text-gray-500">No messages yet.</p>}
           {messages?.map((m) => (
             <div key={m.id} className="p-4 text-sm">
-              <div className="font-medium text-gray-900">{m.customerName ?? m.customerPhone ?? "Unknown"}</div>
+              <div className="flex items-center justify-between">
+                <div className="font-medium text-gray-900">{m.customerName ?? m.customerPhone ?? "Unknown"}</div>
+                <span className="text-xs text-gray-400">{m.channel}</span>
+              </div>
               <div className="text-gray-600">{m.body}</div>
               <div className="text-xs text-gray-400">{new Date(m.createdAt).toLocaleString()}</div>
             </div>

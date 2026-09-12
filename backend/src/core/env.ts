@@ -2,11 +2,13 @@ import { Tenant } from "../models/types";
 
 export interface Bindings {
   DB: D1Database;
-  WHATSAPP_VERIFY_TOKEN?: string;
+  META_VERIFY_TOKEN?: string;
+  JWT_SECRET?: string;
 }
 
 export interface Variables {
   tenant: Tenant;
+  authTenantId: string;
 }
 
 export interface AppEnv {

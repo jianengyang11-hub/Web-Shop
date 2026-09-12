@@ -19,7 +19,7 @@ describe("WhatsApp webhook", () => {
     const res = await whatsapp.request(
       "/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=test-verify-token&hub.challenge=abc123",
       {},
-      { DB: db, WHATSAPP_VERIFY_TOKEN: VERIFY_TOKEN }
+      { DB: db, META_VERIFY_TOKEN: VERIFY_TOKEN }
     );
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("abc123");
@@ -29,7 +29,7 @@ describe("WhatsApp webhook", () => {
     const res = await whatsapp.request(
       "/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=abc123",
       {},
-      { DB: db, WHATSAPP_VERIFY_TOKEN: VERIFY_TOKEN }
+      { DB: db, META_VERIFY_TOKEN: VERIFY_TOKEN }
     );
     expect(res.status).toBe(403);
   });
@@ -54,7 +54,7 @@ describe("WhatsApp webhook", () => {
     const res = await whatsapp.request(
       "/webhooks/whatsapp",
       { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) },
-      { DB: db, WHATSAPP_VERIFY_TOKEN: VERIFY_TOKEN }
+      { DB: db, META_VERIFY_TOKEN: VERIFY_TOKEN }
     );
     expect(res.status).toBe(200);
 
@@ -62,10 +62,11 @@ describe("WhatsApp webhook", () => {
     expect(customer).not.toBeNull();
     expect(customer!.name).toBe("Somchai");
 
-    const { results } = await db.prepare("SELECT * FROM whatsapp_messages WHERE tenant_id = ?").bind(tenant.id).all();
+    const { results } = await db.prepare("SELECT * FROM channel_messages WHERE tenant_id = ?").bind(tenant.id).all();
     expect(results).toHaveLength(1);
     expect(results[0].body).toBe("Hello!");
     expect(results[0].direction).toBe("INBOUND");
+    expect(results[0].channel).toBe("WHATSAPP");
   });
 
   it("acks unknown phone_number_id without throwing", async () => {
@@ -87,7 +88,7 @@ describe("WhatsApp webhook", () => {
     const res = await whatsapp.request(
       "/webhooks/whatsapp",
       { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) },
-      { DB: db, WHATSAPP_VERIFY_TOKEN: VERIFY_TOKEN }
+      { DB: db, META_VERIFY_TOKEN: VERIFY_TOKEN }
     );
     expect(res.status).toBe(200);
   });

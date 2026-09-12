@@ -7,21 +7,31 @@ All responses are JSON. Errors are `{ "detail": "message" }` with an appropriate
 
 | Status | Meaning |
 |---|---|
+| 401 | Missing/invalid/expired bearer token |
+| 403 | Token valid but for a different tenant than the URL |
 | 404 | Not found, or unknown tenant |
 | 409 | Invalid state transition or insufficient stock |
 | 422 | Validation error |
 | 500 | Unexpected server error |
 
+## Authentication
+
+Every `/api/:tenantId/*` route requires `Authorization: Bearer <token>`, where the token's
+`tenantId` claim must match the URL's `:tenantId` — a valid token for one shop is rejected (403)
+against another shop's URL. Get a token via login.
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/auth/login` | `{ tenantId, pin }` → `{ token, tenant: {id, name} }`. Same `401` for an unknown tenant or a wrong PIN, so this endpoint never reveals which tenant ids exist. Token expires after 7 days. |
+
+`POST /api/tenants` and `GET /api/tenants/:id` remain public/unauthenticated (there's no token
+yet before you have an account) — see Multi-tenancy below.
+
 ## Multi-tenancy
 
-Every business endpoint is scoped under `/api/:tenantId/...`. An unknown `tenantId` 404s before
-any handler runs. There is no login system yet — see `docs/ARCHITECTURE.md` for the current
-placeholder and its limits.
-
-`POST /api/tenants` (not tenant-scoped) creates a shop: `{ name, whatsappPhoneNumberId?,
-whatsappAccessToken? }` → `201` with the new tenant (including its `id`, which becomes the path
-segment for every other call). `GET /api/tenants/:id` looks one up (used by the frontend's shop-id
-gate).
+`POST /api/tenants` creates a shop: `{ name, pin }` (`pin` required, 4+ characters) → `201` with
+`{id, name, createdAt}` — never the PIN hash/salt. `GET /api/tenants/:id` looks one up (same
+public shape) for the frontend's login screen to validate a shop id before asking for a PIN.
 
 ## Products
 
@@ -86,19 +96,33 @@ gate).
 | GET | `/api/:tenantId/ai/products/:productId/recommendations` | In-stock variants only |
 | POST | `/api/:tenantId/ai/orders` | Same body as `POST /orders`; always `channel: "AI"`, always `PENDING_CONFIRMATION` |
 
-No AI-reachable route can confirm/reject an order or touch stock/price.
+No AI-reachable route can confirm/reject an order or touch stock/price. Like every other
+`/api/:tenantId/*` route, these also require a Bearer token — an AI/automation integration needs
+one too (see docs/ARCHITECTURE.md's Authentication limits).
 
-## WhatsApp webhook (not tenant-scoped — one URL per Meta App)
+## WhatsApp / Messenger webhooks (not tenant-scoped — one URL per Meta App)
+
+Both share the same `META_VERIFY_TOKEN` secret for the verification handshake — it's one value
+per Meta App, not per product.
 
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/webhooks/whatsapp` | Meta verification handshake (`hub.mode`/`hub.verify_token`/`hub.challenge`) |
-| POST | `/webhooks/whatsapp` | Receives messages; resolves tenant by `phone_number_id`, upserts the customer, logs the message. Always responds 200. |
+| POST | `/webhooks/whatsapp` | Receives messages; resolves tenant by `phone_number_id`, upserts the customer, logs the message, sends a fixed acknowledgement reply if the tenant has a WhatsApp access token configured. Always responds 200. |
+| GET | `/api/webhooks/messenger` | Same verification handshake shape |
+| POST | `/api/webhooks/messenger` | Receives Messenger messages; resolves tenant by Facebook Page id, upserts the customer, logs the message, sends the same fixed acknowledgement via the Messenger Send API if configured. Always responds 200. |
+
+## Settings
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/:tenantId/settings/integrations` | Returns the four WhatsApp/Messenger credential fields (never the PIN hash/salt) |
+| PUT | `/api/:tenantId/settings/integrations` | `{ whatsappPhoneNumberId?, whatsappAccessToken?, messengerPageId?, messengerAccessToken? }` |
 
 ## Notifications & Dashboard
 
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/api/:tenantId/notifications` | Most recent 100 events from the mock notification adapter |
-| GET | `/api/:tenantId/whatsapp-messages` | Most recent 200 logged WhatsApp messages, feeds the AI Conversations page |
+| GET | `/api/:tenantId/whatsapp-messages` | Most recent 200 logged messages from **either** channel (response includes a `channel` field: `WHATSAPP` or `MESSENGER`); route path kept as-is for frontend compatibility |
 | GET | `/api/:tenantId/dashboard/overview` | New/pending/confirmed counts, today's sales, product/low-stock counts, 10 most recent orders |

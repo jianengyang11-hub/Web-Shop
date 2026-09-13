@@ -18,6 +18,8 @@ function toOrderRow(row: Record<string, unknown>): Omit<Order, "items"> {
     updatedAt: row.updated_at as string,
     confirmedAt: (row.confirmed_at as string) ?? null,
     cancelledAt: (row.cancelled_at as string) ?? null,
+    lastActorStaffId: (row.last_actor_staff_id as string) ?? null,
+    lastActorName: (row.last_actor_name as string) ?? null,
   };
 }
 
@@ -144,7 +146,7 @@ export async function claimStatus(
   orderId: string,
   from: OrderStatus,
   to: OrderStatus,
-  extra: { confirmedAt?: string; cancelledAt?: string } = {}
+  extra: { confirmedAt?: string; cancelledAt?: string; actor?: { staffId: string; name: string } } = {}
 ): Promise<boolean> {
   const now = new Date().toISOString();
   const sets = ["status = ?", "updated_at = ?"];
@@ -156,6 +158,10 @@ export async function claimStatus(
   if (extra.cancelledAt !== undefined) {
     sets.push("cancelled_at = ?");
     values.push(extra.cancelledAt);
+  }
+  if (extra.actor !== undefined) {
+    sets.push("last_actor_staff_id = ?", "last_actor_name = ?");
+    values.push(extra.actor.staffId, extra.actor.name);
   }
   values.push(orderId, tenantId, from);
 

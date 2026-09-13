@@ -9,6 +9,8 @@ export interface Bindings {
 export interface Variables {
   tenant: Tenant;
   authTenantId: string;
+  authStaffId: string;
+  authRole: "OWNER" | "STAFF";
 }
 
 export interface AppEnv {

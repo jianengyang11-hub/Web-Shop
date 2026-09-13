@@ -1,5 +1,6 @@
-import { clearToken, getToken, setToken } from "../auth";
+import { clearToken, getToken, setStaffIdentity, setToken } from "../auth";
 import { clearTenantId, getTenantId, setTenantId } from "../tenant";
+import type { Staff } from "../types";
 
 const API_ROOT = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
@@ -100,7 +101,7 @@ export async function changePin(tenantId: string, pin: string): Promise<void> {
   }
 }
 
-/** Logs in and stores both the tenant id and the token on success. */
+/** Logs in and stores the tenant id, token, and which staff member the PIN matched. */
 export async function login(tenantId: string, pin: string): Promise<void> {
   const res = await fetch(`${API_ROOT}/auth/login`, {
     method: "POST",
@@ -114,4 +115,22 @@ export async function login(tenantId: string, pin: string): Promise<void> {
   const data = await res.json();
   setTenantId(data.tenant.id);
   setToken(data.token);
+  setStaffIdentity(data.staff.name, data.staff.role);
+}
+
+/** Owner-only: manage the shop's staff accounts. */
+export async function listStaff(): Promise<Staff[]> {
+  return api.get<Staff[]>("/staff");
+}
+
+export async function addStaff(name: string, pin: string): Promise<Staff> {
+  return api.post<Staff>("/staff", { name, pin });
+}
+
+export async function resetStaffPin(staffId: string, pin: string): Promise<void> {
+  await api.put(`/staff/${staffId}/pin`, { pin });
+}
+
+export async function removeStaff(staffId: string): Promise<void> {
+  await api.delete(`/staff/${staffId}`);
 }

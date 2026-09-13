@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import app from "../src/index";
 import { InsufficientStockError, InvalidTransitionError } from "../src/core/exceptions";
 import { OrderStatus } from "../src/models/enums";
 import { Tenant } from "../src/models/types";
 import * as orderService from "../src/services/orderService";
 import * as productService from "../src/services/productService";
 import { makeTestDb, makeTestTenant } from "./support/setup";
+
+const JWT_SECRET = "test-secret";
+
+function envFor(db: D1Database) {
+  return { DB: db, JWT_SECRET, META_VERIFY_TOKEN: "verify-token" };
+}
 
 async function makeProductWithVariant(db: D1Database, tenantId: string, stockQuantity = 10, price = 100) {
   const product = await productService.createProduct(db, tenantId, { name: "Widget", price });
@@ -96,6 +103,31 @@ describe("order service", () => {
     expect((await orderService.advanceStatus(db, tenant.id, order.id, OrderStatus.DELIVERED)).status).toBe(OrderStatus.DELIVERED);
 
     await expect(orderService.confirmOrder(db, tenant.id, order.id)).rejects.toBeInstanceOf(InvalidTransitionError);
+  });
+
+  it("records which staff member confirmed the order (attribution shown to the Owner)", async () => {
+    const attributedTenant = await makeTestTenant(db, { name: "Attributed Shop", pin: "1234" });
+    const { product, variant } = await makeProductWithVariant(db, attributedTenant.id, 10);
+    const order = await orderService.createOrder(db, attributedTenant.id, orderPayload(product, variant, 1));
+
+    const loginRes = await app.request(
+      "/api/auth/login",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tenantId: attributedTenant.id, pin: "1234" }),
+      },
+      envFor(db)
+    );
+    const { token } = await loginRes.json();
+
+    const confirmRes = await app.request(
+      `/api/${attributedTenant.id}/orders/${order.id}/confirm`,
+      { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      envFor(db)
+    );
+    expect(confirmRes.status).toBe(200);
+    expect((await confirmRes.json()).lastActorName).toBe("Owner");
   });
 
   it("keeps the item snapshot even after the product is edited later", async () => {

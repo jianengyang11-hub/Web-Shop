@@ -4,13 +4,22 @@ const EXPIRY_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 export interface AuthPayload {
   tenantId: string;
+  staffId: string;
+  role: "OWNER" | "STAFF";
   exp: number;
   [key: string]: unknown;
 }
 
-export async function signAuthToken(tenantId: string, secret: string): Promise<string> {
+export async function signAuthToken(
+  tenantId: string,
+  staffId: string,
+  role: "OWNER" | "STAFF",
+  secret: string
+): Promise<string> {
   const payload: AuthPayload = {
     tenantId,
+    staffId,
+    role,
     exp: Math.floor(Date.now() / 1000) + EXPIRY_SECONDS,
   };
   return sign(payload, secret, "HS256");

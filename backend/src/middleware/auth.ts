@@ -29,5 +29,15 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   c.set("authTenantId", payload.tenantId);
+  c.set("authStaffId", payload.staffId);
+  c.set("authRole", payload.role);
+  await next();
+});
+
+/** Mount after authMiddleware on routes only an Owner may use (staff management, etc). */
+export const requireOwner = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.get("authRole") !== "OWNER") {
+    return c.json({ detail: "Only the shop owner can do this" }, 403);
+  }
   await next();
 });

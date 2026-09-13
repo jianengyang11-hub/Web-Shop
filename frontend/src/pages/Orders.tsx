@@ -29,6 +29,7 @@ export default function Orders() {
               <div className="text-sm font-medium text-gray-900">{o.orderNumber}</div>
               <div className="text-xs text-gray-500">
                 {o.items.length} item(s) · ฿{o.total.toFixed(2)} · {new Date(o.createdAt).toLocaleString()}
+                {o.lastActorName && <> · โดย {o.lastActorName}</>}
               </div>
             </div>
             <StatusBadge status={o.status} />

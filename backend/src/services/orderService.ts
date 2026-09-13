@@ -32,6 +32,11 @@ export interface OrderCreateInput {
   channel?: OrderChannel;
 }
 
+export interface OrderActor {
+  staffId: string;
+  name: string;
+}
+
 async function resolveCustomerId(db: D1Database, tenantId: string, input?: CustomerInput): Promise<string | null> {
   if (!input) return null;
   if (input.id) {
@@ -135,13 +140,14 @@ export async function listOrders(db: D1Database, tenantId: string): Promise<Orde
  * order reverted to PENDING_CONFIRMATION) so the net effect is "nothing happened" — no partial
  * deduction, order stays PENDING_CONFIRMATION, exactly as required.
  */
-export async function confirmOrder(db: D1Database, tenantId: string, orderId: string): Promise<Order> {
+export async function confirmOrder(db: D1Database, tenantId: string, orderId: string, actor?: OrderActor): Promise<Order> {
   const order = await getOrder(db, tenantId, orderId);
   validateTransition(order.status, OrderStatus.CONFIRMED);
 
   const now = new Date().toISOString();
   const claimed = await orderRepository.claimStatus(db, tenantId, orderId, OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED, {
     confirmedAt: now,
+    actor,
   });
   if (!claimed) {
     throw new InvalidTransitionError(`Order ${orderId} is no longer PENDING_CONFIRMATION (already handled)`);
@@ -174,11 +180,11 @@ export async function confirmOrder(db: D1Database, tenantId: string, orderId: st
   return confirmed;
 }
 
-export async function rejectOrder(db: D1Database, tenantId: string, orderId: string): Promise<Order> {
+export async function rejectOrder(db: D1Database, tenantId: string, orderId: string, actor?: OrderActor): Promise<Order> {
   const order = await getOrder(db, tenantId, orderId);
   validateTransition(order.status, OrderStatus.REJECTED);
 
-  const claimed = await orderRepository.claimStatus(db, tenantId, orderId, order.status, OrderStatus.REJECTED);
+  const claimed = await orderRepository.claimStatus(db, tenantId, orderId, order.status, OrderStatus.REJECTED, { actor });
   if (!claimed) throw new InvalidTransitionError(`Order ${orderId} is no longer ${order.status}`);
 
   const updated = await getOrder(db, tenantId, orderId);
@@ -192,11 +198,17 @@ export async function rejectOrder(db: D1Database, tenantId: string, orderId: str
 }
 
 /** Handles the non-stock-affecting transitions: preparing, shipped, delivered, cancelled. */
-export async function advanceStatus(db: D1Database, tenantId: string, orderId: string, target: OrderStatus): Promise<Order> {
+export async function advanceStatus(
+  db: D1Database,
+  tenantId: string,
+  orderId: string,
+  target: OrderStatus,
+  actor?: OrderActor
+): Promise<Order> {
   const order = await getOrder(db, tenantId, orderId);
   validateTransition(order.status, target);
 
-  const extra = target === OrderStatus.CANCELLED ? { cancelledAt: new Date().toISOString() } : {};
+  const extra = target === OrderStatus.CANCELLED ? { cancelledAt: new Date().toISOString(), actor } : { actor };
   const claimed = await orderRepository.claimStatus(db, tenantId, orderId, order.status, target, extra);
   if (!claimed) throw new InvalidTransitionError(`Order ${orderId} is no longer ${order.status}`);
 

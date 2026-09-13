@@ -4,6 +4,7 @@ import { verifyAuthToken } from "../core/authToken";
 import { hashPin } from "../core/pin";
 import { ConflictError, ValidationError } from "../core/exceptions";
 import { Tenant } from "../models/types";
+import * as staffRepository from "../repositories/staffRepository";
 import * as tenantRepository from "../repositories/tenantRepository";
 
 /** Top-level, NOT tenant-scoped — used to create a new shop and to let the frontend's login
@@ -35,13 +36,20 @@ tenants.post("/tenants", async (c) => {
     throw new ConflictError(`Shop id "${id}" is already taken`);
   }
 
+  const tenant = await tenantRepository.create(c.env.DB, { id, name: body.name });
+
+  // The shop's creator becomes its first staff row (role OWNER) — every login, including this
+  // one, authenticates against a staff PIN rather than a tenant-level PIN.
   const { hash, salt } = await hashPin(body.pin);
-  const tenant = await tenantRepository.create(c.env.DB, {
-    id,
-    name: body.name,
+  await staffRepository.create(c.env.DB, {
+    id: crypto.randomUUID(),
+    tenantId: tenant.id,
+    name: "Owner",
     pinHash: hash,
     pinSalt: salt,
+    role: "OWNER",
   });
+
   return c.json(toPublicTenant(tenant), 201);
 });
 
@@ -51,10 +59,10 @@ tenants.get("/tenants/:id", async (c) => {
   return c.json(toPublicTenant(tenant));
 });
 
-/** Changes the PIN for a shop the caller already holds a valid token for. Not mounted under
+/** Changes the caller's OWN PIN (whichever staff member they logged in as). Not mounted under
  * /api/:tenantId/* (this router is registered before that wildcard), so auth is checked by hand
- * here — same tenant-match rule as authMiddleware, to stop a token for one shop resetting
- * another's PIN. */
+ * here — same tenant-match rule as authMiddleware, to stop a token for one shop touching
+ * another's staff. */
 tenants.put("/tenants/:id/pin", async (c) => {
   const tenantId = c.req.param("id");
 
@@ -78,15 +86,18 @@ tenants.put("/tenants/:id/pin", async (c) => {
     return c.json({ detail: "Token does not grant access to this shop" }, 403);
   }
 
-  const tenant = await tenantRepository.get(c.env.DB, tenantId);
-  if (!tenant) return c.json({ detail: `Tenant ${tenantId} not found` }, 404);
+  const staff = await staffRepository.get(c.env.DB, tenantId, payload.staffId);
+  if (!staff) return c.json({ detail: "Staff account not found" }, 404);
 
   const body = await c.req.json<{ pin: string }>();
   if (!body.pin || body.pin.length < 4) {
     throw new ValidationError("pin must be at least 4 characters");
   }
+  if (await staffRepository.pinTakenInTenant(c.env.DB, tenantId, body.pin, staff.id)) {
+    throw new ConflictError("PIN นี้ถูกใช้งานโดยพนักงานคนอื่นในร้านนี้แล้ว กรุณาเลือก PIN อื่น");
+  }
 
   const { hash, salt } = await hashPin(body.pin);
-  await tenantRepository.updatePin(c.env.DB, tenantId, hash, salt);
+  await staffRepository.updatePin(c.env.DB, tenantId, staff.id, hash, salt);
   return c.json({ ok: true });
 });

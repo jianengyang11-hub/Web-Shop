@@ -70,6 +70,16 @@ export interface Order {
   updatedAt: string;
   confirmedAt: string | null;
   cancelledAt: string | null;
+  lastActorName: string | null;
+}
+
+export type StaffRole = "OWNER" | "STAFF";
+
+export interface Staff {
+  id: string;
+  name: string;
+  role: StaffRole;
+  createdAt: string;
 }
 
 export interface DashboardOverview {

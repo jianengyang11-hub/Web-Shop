@@ -59,6 +59,7 @@ export default function OrderDetail() {
         </div>
         <div className="text-xs text-gray-500">
           Created {new Date(order.createdAt).toLocaleString()} · Channel: {order.channel}
+          {order.lastActorName && <> · ดำเนินการล่าสุดโดย: {order.lastActorName}</>}
         </div>
 
         <div className="divide-y divide-gray-100 border-t border-gray-100 pt-2">

@@ -65,10 +65,6 @@ export async function create(
   return (await get(db, fields.id))!;
 }
 
-export async function updatePin(db: D1Database, tenantId: string, pinHash: string, pinSalt: string): Promise<void> {
-  await db.prepare("UPDATE tenants SET pin_hash = ?, pin_salt = ? WHERE id = ?").bind(pinHash, pinSalt, tenantId).run();
-}
-
 const INTEGRATION_COLUMNS: Record<string, string> = {
   whatsappPhoneNumberId: "whatsapp_phone_number_id",
   whatsappAccessToken: "whatsapp_access_token",

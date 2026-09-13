@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { clearToken } from "../auth";
+import { clearToken, getStaffName, getStaffRole } from "../auth";
 import { clearTenantId } from "../tenant";
 
 const NAV_ITEMS = [
@@ -31,10 +31,20 @@ function handleLogout() {
 }
 
 export default function Layout() {
+  const staffName = getStaffName();
+  const staffRole = getStaffRole();
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       <aside className="hidden md:flex md:w-56 md:flex-col md:border-r md:border-gray-200 md:bg-white md:sticky md:top-0 md:h-screen">
-        <div className="px-4 py-5 text-lg font-bold text-gray-900">Shop Owner</div>
+        <div className="px-4 py-5">
+          <div className="text-lg font-bold text-gray-900">Shop Owner</div>
+          {staffName && (
+            <div className="text-xs text-gray-500">
+              {staffName} · {staffRole === "OWNER" ? "เจ้าของร้าน" : "พนักงาน"}
+            </div>
+          )}
+        </div>
         <nav className="flex-1 px-2 space-y-1">
           {NAV_ITEMS.map((item) => (
             <NavLink

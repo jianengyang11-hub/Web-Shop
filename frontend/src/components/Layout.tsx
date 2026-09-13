@@ -1,4 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { clearToken } from "../auth";
+import { clearTenantId } from "../tenant";
 
 const NAV_ITEMS = [
   { to: "/", label: "Overview", icon: "🏠", end: true },
@@ -20,6 +22,12 @@ const MOBILE_NAV_ITEMS = NAV_ITEMS.filter((item) =>
 
 function navLinkClass(isActive: boolean, base: string) {
   return `${base} ${isActive ? "text-gray-900 font-semibold" : "text-gray-500"}`;
+}
+
+function handleLogout() {
+  clearToken();
+  clearTenantId();
+  window.location.reload();
 }
 
 export default function Layout() {
@@ -45,6 +53,15 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        <div className="px-2 pb-4">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+          >
+            <span>🚪</span>
+            Logout
+          </button>
+        </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">

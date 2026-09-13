@@ -46,6 +46,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     } catch {
       // ignore
     }
+
+    // The saved shop id itself no longer exists (deleted, or a stale/borrowed browser profile) —
+    // tenantMiddleware's 404 fires before any resource lookup, so this can only mean the shop is
+    // gone, not "some order/product wasn't found". Recover the same way as an expired token
+    // instead of leaving the user stuck on a raw error.
+    if (res.status === 404 && /^Tenant .* not found$/.test(detail)) {
+      clearToken();
+      clearTenantId();
+      window.location.reload();
+      throw new ApiError(404, "Shop no longer exists");
+    }
+
     throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;

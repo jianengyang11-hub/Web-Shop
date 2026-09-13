@@ -3,6 +3,7 @@ import { AppEnv } from "../core/env";
 import { requireOwner } from "../middleware/auth";
 import { ConflictError, NotFoundError, ValidationError } from "../core/exceptions";
 import { hashPin } from "../core/pin";
+import { generateRecoveryCode } from "../core/recoveryCode";
 import { Staff } from "../models/types";
 import * as staffRepository from "../repositories/staffRepository";
 
@@ -44,7 +45,14 @@ staff.post("/staff", async (c) => {
     pinSalt: salt,
     role: "STAFF",
   });
-  return c.json(toPublicStaff(created), 201);
+
+  // Shown once here, for the Owner to pass along to the new staff member — same as the recovery
+  // code generated at shop creation.
+  const recoveryCode = generateRecoveryCode();
+  const { hash: codeHash, salt: codeSalt } = await hashPin(recoveryCode);
+  await staffRepository.setRecoveryCode(c.env.DB, tenant.id, created.id, codeHash, codeSalt);
+
+  return c.json({ ...toPublicStaff(created), recoveryCode }, 201);
 });
 
 staff.put("/staff/:staffId/pin", async (c) => {

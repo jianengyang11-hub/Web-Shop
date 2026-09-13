@@ -81,11 +81,33 @@ export async function fetchTenant(id: string): Promise<{ id: string; name: strin
   return res.json();
 }
 
-export async function createTenant(name: string, pin: string, id?: string): Promise<{ id: string; name: string }> {
+export async function createTenant(
+  name: string,
+  pin: string,
+  id?: string
+): Promise<{ id: string; name: string; recoveryCode: string }> {
   const res = await fetch(`${API_ROOT}/tenants`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, name, pin }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, body.detail ?? res.statusText);
+  }
+  return res.json();
+}
+
+/** "Forgot PIN" recovery — no shop id needed, the recovery code alone identifies the account.
+ * Sets a new PIN and returns a freshly rotated recovery code (the old one stops working). */
+export async function recoverPin(
+  recoveryCode: string,
+  newPin: string
+): Promise<{ tenantId: string; tenantName: string; staffName: string; newRecoveryCode: string }> {
+  const res = await fetch(`${API_ROOT}/auth/recover`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recoveryCode, newPin }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -135,8 +157,8 @@ export async function listStaff(): Promise<Staff[]> {
   return api.get<Staff[]>("/staff");
 }
 
-export async function addStaff(name: string, pin: string): Promise<Staff> {
-  return api.post<Staff>("/staff", { name, pin });
+export async function addStaff(name: string, pin: string): Promise<Staff & { recoveryCode: string }> {
+  return api.post<Staff & { recoveryCode: string }>("/staff", { name, pin });
 }
 
 export async function resetStaffPin(staffId: string, pin: string): Promise<void> {
@@ -145,4 +167,10 @@ export async function resetStaffPin(staffId: string, pin: string): Promise<void>
 
 export async function removeStaff(staffId: string): Promise<void> {
   await api.delete(`/staff/${staffId}`);
+}
+
+/** Generates (and overwrites) the CALLER's own recovery code, for the "forgot PIN" flow.
+ * Returned in plaintext exactly once — only its hash is ever stored server-side. */
+export async function generateMyRecoveryCode(): Promise<string> {
+  return (await api.post<{ recoveryCode: string }>("/staff/me/recovery-code")).recoveryCode;
 }

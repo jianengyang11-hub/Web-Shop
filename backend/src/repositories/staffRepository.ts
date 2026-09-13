@@ -9,6 +9,8 @@ function toStaff(row: Record<string, unknown>): Staff {
     pinHash: row.pin_hash as string,
     pinSalt: row.pin_salt as string,
     role: row.role as StaffRole,
+    recoveryCodeHash: (row.recovery_code_hash as string) ?? null,
+    recoveryCodeSalt: (row.recovery_code_salt as string) ?? null,
     createdAt: row.created_at as string,
   };
 }
@@ -73,6 +75,36 @@ export async function updatePin(db: D1Database, tenantId: string, staffId: strin
     .prepare("UPDATE staff SET pin_hash = ?, pin_salt = ? WHERE id = ? AND tenant_id = ?")
     .bind(pinHash, pinSalt, staffId, tenantId)
     .run();
+}
+
+export async function setRecoveryCode(db: D1Database, tenantId: string, staffId: string, hash: string, salt: string): Promise<void> {
+  await db
+    .prepare("UPDATE staff SET recovery_code_hash = ?, recovery_code_salt = ? WHERE id = ? AND tenant_id = ?")
+    .bind(hash, salt, staffId, tenantId)
+    .run();
+}
+
+/** Looks up which staff member (in which shop) a recovery code belongs to, without needing the
+ * shop id first — this is how "forgot PIN" also recovers a forgotten shop id. Only staff rows
+ * that have ever generated a code are scanned. Small total-staff counts across the whole system
+ * keep this cheap; see findByPin for the same per-tenant pattern. */
+export async function findByRecoveryCode(
+  db: D1Database,
+  code: string
+): Promise<{ staff: Staff; tenantName: string } | null> {
+  const { results } = await db
+    .prepare(
+      `SELECT s.*, t.name AS tenant_name FROM staff s JOIN tenants t ON t.id = s.tenant_id
+       WHERE s.recovery_code_hash IS NOT NULL`
+    )
+    .all();
+  for (const row of results) {
+    const staff = toStaff(row);
+    if (staff.recoveryCodeSalt && staff.recoveryCodeHash && (await verifyPin(code, staff.recoveryCodeSalt, staff.recoveryCodeHash))) {
+      return { staff, tenantName: row.tenant_name as string };
+    }
+  }
+  return null;
 }
 
 export async function countOwners(db: D1Database, tenantId: string): Promise<number> {

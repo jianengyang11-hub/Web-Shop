@@ -1,10 +1,14 @@
 import { Hono } from "hono";
 import { AppEnv } from "../core/env";
+import { requireOwner } from "../middleware/auth";
 import * as tenantRepository from "../repositories/tenantRepository";
 
-/** Auth-protected (mounted under /api/:tenantId, behind authMiddleware). Never returns
- * pin_hash/pin_salt — only the four integration credential fields the Owner manages here. */
+/** Auth-protected (mounted under /api/:tenantId, behind authMiddleware) and Owner-only. Never
+ * returns pin_hash/pin_salt — only the four integration credential fields the Owner manages
+ * here. */
 export const settings = new Hono<AppEnv>();
+
+settings.use("*", requireOwner);
 
 function toIntegrationSettings(tenant: {
   whatsappPhoneNumberId: string | null;

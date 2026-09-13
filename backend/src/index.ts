@@ -14,6 +14,7 @@ import { orders } from "./routes/orders";
 import { products } from "./routes/products";
 import { settings } from "./routes/settings";
 import { staff } from "./routes/staff";
+import { staffSelf } from "./routes/staffSelf";
 import { tenants } from "./routes/tenants";
 import { variants } from "./routes/variants";
 import { messenger } from "./webhooks/messenger";
@@ -48,6 +49,7 @@ app.route("/api/:tenantId", dashboard);
 app.route("/api/:tenantId", channelMessages);
 app.route("/api/:tenantId", settings);
 app.route("/api/:tenantId", staff);
+app.route("/api/:tenantId", staffSelf);
 
 app.onError((err, c) => {
   if (err instanceof AppError) {

@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
-import { ApiError, addStaff, api, changePin, createTenant, listStaff, removeStaff, resetStaffPin } from "../api/client";
+import { Navigate } from "react-router-dom";
+import {
+  ApiError,
+  addStaff,
+  api,
+  changePin,
+  createTenant,
+  generateMyRecoveryCode,
+  listStaff,
+  removeStaff,
+  resetStaffPin,
+} from "../api/client";
 import { getStaffRole } from "../auth";
+import RecoveryCodeNotice from "../components/RecoveryCodeNotice";
 import { getTenantId } from "../tenant";
 import type { Staff } from "../types";
 
@@ -19,6 +31,14 @@ const EMPTY: IntegrationSettings = {
 };
 
 export default function Settings() {
+  // Owner-only page — a STAFF account has no reason to reach WhatsApp/Messenger credentials,
+  // shop creation, or staff management, so send them back rather than rendering any of it.
+  if (getStaffRole() !== "OWNER") return <Navigate to="/" replace />;
+
+  return <SettingsPage />;
+}
+
+function SettingsPage() {
   const [form, setForm] = useState<IntegrationSettings>(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -122,6 +142,7 @@ export default function Settings() {
 
       <NewShopForm />
       <ChangePinForm />
+      <RecoveryCodeSection />
       {getStaffRole() === "OWNER" && <StaffManagement />}
     </div>
   );
@@ -133,6 +154,7 @@ function StaffManagement() {
 
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
+  const [newStaffRecoveryCode, setNewStaffRecoveryCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [resetTargetId, setResetTargetId] = useState<string | null>(null);
@@ -150,13 +172,15 @@ function StaffManagement() {
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNewStaffRecoveryCode(null);
     if (!name.trim() || pin.trim().length < 4) {
       setError("กรุณากรอกชื่อพนักงานและ PIN อย่างน้อย 4 หลัก");
       return;
     }
     setBusy(true);
     try {
-      await addStaff(name.trim(), pin.trim());
+      const created = await addStaff(name.trim(), pin.trim());
+      setNewStaffRecoveryCode(created.recoveryCode);
       setName("");
       setPin("");
       load();
@@ -287,6 +311,9 @@ function StaffManagement() {
           placeholder="PIN ของพนักงาน (4 หลักขึ้นไป)"
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
         />
+        {newStaffRecoveryCode && (
+          <RecoveryCodeNotice code={newStaffRecoveryCode} label="รหัสกู้คืนบัญชีของพนักงานคนนี้ (ส่งต่อให้เขาเก็บไว้)" />
+        )}
         <button
           type="submit"
           disabled={busy}
@@ -305,12 +332,14 @@ function NewShopForm() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [newRecoveryCode, setNewRecoveryCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setNewRecoveryCode(null);
     if (!name.trim() || pin.trim().length < 4) {
       setError("กรุณากรอกชื่อร้านและ PIN อย่างน้อย 4 หลัก");
       return;
@@ -319,6 +348,7 @@ function NewShopForm() {
     try {
       const tenant = await createTenant(name.trim(), pin.trim(), shopId.trim() || undefined);
       setSuccess(`สร้างร้าน "${tenant.name}" สำเร็จ (Shop ID: ${tenant.id})`);
+      setNewRecoveryCode(tenant.recoveryCode);
       setName("");
       setShopId("");
       setPin("");
@@ -361,6 +391,7 @@ function NewShopForm() {
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {success && <p className="text-sm text-green-600">{success}</p>}
+      {newRecoveryCode && <RecoveryCodeNotice code={newRecoveryCode} label="รหัสกู้คืนบัญชีของร้านใหม่ (Recovery Code)" />}
       <button
         type="submit"
         disabled={busy}
@@ -369,6 +400,42 @@ function NewShopForm() {
         สร้างร้านค้า
       </button>
     </form>
+  );
+}
+
+function RecoveryCodeSection() {
+  const [code, setCode] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleGenerate() {
+    setError(null);
+    setBusy(true);
+    try {
+      setCode(await generateMyRecoveryCode());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "สร้างรหัสกู้คืนไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <h2 className="font-semibold text-gray-900">รหัสกู้คืนบัญชี (Recovery Code)</h2>
+      <p className="text-xs text-gray-500">
+        ใช้ตอนลืม PIN — กดสร้างแล้วบันทึกรหัสไว้ในที่ปลอดภัย ระบบจะไม่แสดงรหัสเดิมซ้ำอีก และรหัสเก่าจะใช้ไม่ได้ทันทีที่สร้างใหม่
+      </p>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {code && <RecoveryCodeNotice code={code} label="รหัสกู้คืนบัญชีของฉัน" />}
+      <button
+        onClick={handleGenerate}
+        disabled={busy}
+        className="w-full bg-gray-900 text-white rounded-lg py-2.5 font-medium disabled:opacity-50"
+      >
+        {code ? "สร้างรหัสใหม่ (รหัสเดิมจะใช้ไม่ได้)" : "สร้างรหัสกู้คืน"}
+      </button>
+    </div>
   );
 }
 

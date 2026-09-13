@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { AppEnv } from "../core/env";
 import { verifyAuthToken } from "../core/authToken";
 import { hashPin } from "../core/pin";
+import { generateRecoveryCode } from "../core/recoveryCode";
 import { ConflictError, ValidationError } from "../core/exceptions";
 import { Tenant } from "../models/types";
 import * as staffRepository from "../repositories/staffRepository";
@@ -41,7 +42,7 @@ tenants.post("/tenants", async (c) => {
   // The shop's creator becomes its first staff row (role OWNER) — every login, including this
   // one, authenticates against a staff PIN rather than a tenant-level PIN.
   const { hash, salt } = await hashPin(body.pin);
-  await staffRepository.create(c.env.DB, {
+  const owner = await staffRepository.create(c.env.DB, {
     id: crypto.randomUUID(),
     tenantId: tenant.id,
     name: "Owner",
@@ -50,7 +51,13 @@ tenants.post("/tenants", async (c) => {
     role: "OWNER",
   });
 
-  return c.json(toPublicTenant(tenant), 201);
+  // A recovery code up front, shown once, so "forgot PIN" has something to fall back on from
+  // day one instead of only after the Owner remembers to generate one.
+  const recoveryCode = generateRecoveryCode();
+  const { hash: codeHash, salt: codeSalt } = await hashPin(recoveryCode);
+  await staffRepository.setRecoveryCode(c.env.DB, tenant.id, owner.id, codeHash, codeSalt);
+
+  return c.json({ ...toPublicTenant(tenant), recoveryCode }, 201);
 });
 
 tenants.get("/tenants/:id", async (c) => {

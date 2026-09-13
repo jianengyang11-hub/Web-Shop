@@ -9,7 +9,7 @@ import { createTestD1 } from "./d1";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(__dirname, "../../migrations");
-const migrationSql = ["0001_init.sql", "0002_auth_and_settings.sql", "0003_staff.sql"]
+const migrationSql = ["0001_init.sql", "0002_auth_and_settings.sql", "0003_staff.sql", "0004_recovery_code.sql"]
   .map((file) => readFileSync(join(migrationsDir, file), "utf-8"))
   .join("\n");
 

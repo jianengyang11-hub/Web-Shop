@@ -33,6 +33,7 @@ function handleLogout() {
 export default function Layout() {
   const staffName = getStaffName();
   const staffRole = getStaffRole();
+  const navItems = NAV_ITEMS.filter((item) => item.to !== "/settings" || staffRole === "OWNER");
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -46,7 +47,7 @@ export default function Layout() {
           )}
         </div>
         <nav className="flex-1 px-2 space-y-1">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

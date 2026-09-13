@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import app from "../src/index";
 import { Tenant } from "../src/models/types";
-import { makeTestDb, makeTestTenant } from "./support/setup";
+import { makeTestDb, makeTestStaff, makeTestTenant } from "./support/setup";
 
 const JWT_SECRET = "test-secret";
 
@@ -61,5 +61,28 @@ describe("integration settings", () => {
     );
     const fetched = await getRes.json();
     expect(fetched).toEqual(saved);
+  });
+
+  it("blocks a STAFF-role token from reading or changing integrations", async () => {
+    await makeTestStaff(db, tenant.id, { name: "Nan", pin: "5678", role: "STAFF" });
+    const staffToken = await loginToken(db, tenant, "5678");
+
+    const getRes = await app.request(
+      `/api/${tenant.id}/settings/integrations`,
+      { headers: { Authorization: `Bearer ${staffToken}` } },
+      envFor(db)
+    );
+    expect(getRes.status).toBe(403);
+
+    const putRes = await app.request(
+      `/api/${tenant.id}/settings/integrations`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${staffToken}` },
+        body: JSON.stringify({ whatsappPhoneNumberId: "hacked" }),
+      },
+      envFor(db)
+    );
+    expect(putRes.status).toBe(403);
   });
 });

@@ -21,6 +21,8 @@ export interface Staff {
   pinHash: string;
   pinSalt: string;
   role: StaffRole;
+  recoveryCodeHash: string | null;
+  recoveryCodeSalt: string | null;
   createdAt: string;
 }
 

@@ -68,17 +68,36 @@ export async function fetchTenant(id: string): Promise<{ id: string; name: strin
   return res.json();
 }
 
-export async function createTenant(name: string, pin: string): Promise<{ id: string; name: string }> {
+export async function createTenant(name: string, pin: string, id?: string): Promise<{ id: string; name: string }> {
   const res = await fetch(`${API_ROOT}/tenants`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, pin }),
+    body: JSON.stringify({ id, name, pin }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new ApiError(res.status, body.detail ?? res.statusText);
   }
   return res.json();
+}
+
+/** Changes the PIN for the currently logged-in tenant. Not tenant-scoped through `api` since the
+ * endpoint lives under /api/tenants/:id/pin rather than /api/:tenantId/..., but it still requires
+ * the caller's own bearer token. */
+export async function changePin(tenantId: string, pin: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(`${API_ROOT}/tenants/${tenantId}/pin`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ pin }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, body.detail ?? res.statusText);
+  }
 }
 
 /** Logs in and stores both the tenant id and the token on success. */

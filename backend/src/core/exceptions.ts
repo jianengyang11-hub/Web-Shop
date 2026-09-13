@@ -22,3 +22,7 @@ export class InsufficientStockError extends AppError {
 export class ValidationError extends AppError {
   statusCode = 422;
 }
+
+export class ConflictError extends AppError {
+  statusCode = 409;
+}

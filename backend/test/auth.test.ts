@@ -119,4 +119,117 @@ describe("auth", () => {
     expect(body.pinHash).toBeUndefined();
     expect(body.pinSalt).toBeUndefined();
   });
+
+  it("creates a tenant with a caller-chosen id", async () => {
+    const res = await app.request(
+      "/api/tenants",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "my-cool-shop", name: "Cool Shop", pin: "4242" }),
+      },
+      envFor(db)
+    );
+    expect(res.status).toBe(201);
+    expect((await res.json()).id).toBe("my-cool-shop");
+  });
+
+  it("rejects a duplicate caller-chosen id", async () => {
+    await app.request(
+      "/api/tenants",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "taken-shop", name: "First", pin: "4242" }),
+      },
+      envFor(db)
+    );
+    const res = await app.request(
+      "/api/tenants",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "taken-shop", name: "Second", pin: "4242" }),
+      },
+      envFor(db)
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it("rejects a malformed caller-chosen id", async () => {
+    const res = await app.request(
+      "/api/tenants",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "a b!", name: "Bad Id Shop", pin: "4242" }),
+      },
+      envFor(db)
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("changes a tenant's pin with a valid matching token, and the new pin works at login", async () => {
+    const loginRes = await app.request(
+      "/api/auth/login",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tenantId: tenant.id, pin: "1234" }) },
+      envFor(db)
+    );
+    const { token } = await loginRes.json();
+
+    const changeRes = await app.request(
+      `/api/tenants/${tenant.id}/pin`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pin: "9999" }),
+      },
+      envFor(db)
+    );
+    expect(changeRes.status).toBe(200);
+
+    const oldPinLogin = await app.request(
+      "/api/auth/login",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tenantId: tenant.id, pin: "1234" }) },
+      envFor(db)
+    );
+    expect(oldPinLogin.status).toBe(401);
+
+    const newPinLogin = await app.request(
+      "/api/auth/login",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tenantId: tenant.id, pin: "9999" }) },
+      envFor(db)
+    );
+    expect(newPinLogin.status).toBe(200);
+  });
+
+  it("rejects a pin change with no token", async () => {
+    const res = await app.request(
+      `/api/tenants/${tenant.id}/pin`,
+      { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ pin: "9999" }) },
+      envFor(db)
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects a pin change with a token for a different tenant", async () => {
+    const otherTenant = await makeTestTenant(db, { name: "Other Shop", pin: "5678" });
+    const loginRes = await app.request(
+      "/api/auth/login",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tenantId: otherTenant.id, pin: "5678" }) },
+      envFor(db)
+    );
+    const { token } = await loginRes.json();
+
+    const res = await app.request(
+      `/api/tenants/${tenant.id}/pin`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pin: "9999" }),
+      },
+      envFor(db)
+    );
+    expect(res.status).toBe(403);
+  });
 });
